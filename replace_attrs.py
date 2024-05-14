@@ -212,7 +212,8 @@ for xml_file in all_xml_files:
             else:
                 confirm = 'y'
             if confirm.lower()[0] == 'y':
-                with open(xml_file, 'wb') as rf:
+                new_file_name = f"{xml_file.rsplit('.', 1)[0]}_v17migrated.{xml_file.rsplit('.', 1)[1]}"
+                with open(new_file_name, 'wb') as rf:
                     html = soup.prettify(formatter=xml_4indent_formatter)
                     html = prettify_output(html)
                     for percent_d_result in percent_d_results.keys():
