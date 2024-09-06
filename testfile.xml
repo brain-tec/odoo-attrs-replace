@@ -21,7 +21,7 @@
         <xpath expr="//test_states_attrs_with_invisible_existing" position="attributes">
             <attribute name="attrs">{
             'invisible': [
-                '|', 
+                '|',
                 '|',
                 '&amp;',
                 ('test1', 'in', [1, 2, 3]),
@@ -38,7 +38,7 @@
         </xpath>
         <field name="test" attrs="{
             'invisible': [
-                '|', 
+                '|',
                 '|',
                 '&amp;',
                 ('test1', 'in', [1, 2, 3]),

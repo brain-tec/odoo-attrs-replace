@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <form>
+        <xpath expr="//">
+            <!-- this is a copy of testfile's first xpath, used to check the result ordering -->
+            <field attrs="{'invisible': True, 'readonly': ['|', '|', '&amp;', ('field1', '=', 'yes'), ('field2', '=', 'yes'), '|', ('field3', '=', 'yes'), ('field4', '=', 'yes'), ('field5', '=', 'yes'), ('field6', '=', 'yes')], 'required': [('field', 'in', ['a', 'b', 'c'])], 'column_invisible': 0}" name="name"/>
+        </xpath>
+    </form>
+</odoo>

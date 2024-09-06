@@ -1,10 +1,35 @@
 # -*- coding: utf-8 -*-
 
 import re
-from bs4 import formatter, BeautifulSoup as bs
+
+from bs4 import BeautifulSoup as bs
+from bs4.formatter import XMLFormatter
 from pathlib import Path
 
-xml_4indent_formatter = formatter.XMLFormatter(indent=4)
+# We need to use our own custom formatter to try and keep the order of attributes so name doesn't end wherever
+# bs4 leave it (bs4 orders the attributes alphabetically with the basic formatters)
+
+class UnsortedAttributes(XMLFormatter):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(indent=4)
+
+    def attributes(self, tag):
+        for k, v in tag.attrs.items():
+            yield k, v
+
+
+def adjust_indent(match):
+    indent = match.group(1)  # Capture the indentation
+    closing_tag = match.group(2)  # Capture the closing tag
+    field_tag = match.group(3)  # Capture the </field> tag
+
+    # Use only the first 4 characters of the indentation
+    new_indent = indent[:-4]  # Create the indentation for where the /field tag is going to be
+
+    # Return the adjusted output which should be ident+closing_tag+shorter_indent(which includes \n)+<field>
+    return f"{indent}{closing_tag}{new_indent}{field_tag}"
+
 NEW_ATTRS = {'required', 'invisible', 'readonly', 'column_invisible'}
 percent_d_regex = re.compile("%\('?\"?[\w\.\d_]+'?\"?\)d")
 
@@ -102,12 +127,14 @@ def get_new_attrs(attrs):
 # And changed to avoid putting ALL one line, and only manage <attribute>, as it's the only one messing stuff here
 # Kinda ugly to use the 3 types of tags but tbh I keep it like this while I have no time for a regex replace keeping the name="x" :p
 def prettify_output(html):
-    for attr in NEW_ATTRS:
-        html = re.sub(f'<attribute name="{attr}">[ \n]+',f'<attribute name="{attr}">', html)
+    # match attribute='any_value' with a following \n and removed said \n
+    html = re.sub(r'(<attribute name="[^"]+">)[ \n]+',r'\1', html)
     html = re.sub(f'[ \n]+</attribute>',f'</attribute>', html)
     html = re.sub(r'<field name="([a-z_]+)">[ \n]+', r'<field name="\1">', html)
     html = re.sub(r'[ \n]+</field>', r'</field>', html)
+    html = re.sub(r'(\s*)(</[^>]+>)(</field>)', adjust_indent, html)
     return html
+
 
 autoreplace = input('Do you want to auto-replace attributes ? (y/n) (empty == no) (will not ask confirmation for each file) : ') or 'n'
 nofilesfound = True
@@ -128,7 +155,7 @@ for xml_file in all_xml_files:
                 percent_d_results[counter_for_percent_d_replace] = percent_d
                 counter_for_percent_d_replace += 1
             soup = bs(contents, 'xml')
-            tags_with_attrs = soup.select('[attrs]')
+            tags_with_attrs = soup.select('[attrs]', )
             attribute_tags_name_attrs = soup.select('attribute[name="attrs"]')
             tags_with_states = soup.select('[states]')
             attribute_tags_name_states = soup.select('attribute[name="states"]')
@@ -213,7 +240,7 @@ for xml_file in all_xml_files:
                 confirm = 'y'
             if confirm.lower()[0] == 'y':
                 with open(xml_file, 'wb') as rf:
-                    html = soup.prettify(formatter=xml_4indent_formatter)
+                    html = soup.prettify(formatter=UnsortedAttributes())
                     html = prettify_output(html)
                     for percent_d_result in percent_d_results.keys():
                         html = html.replace("'REPLACEME%s'" % percent_d_result, percent_d_results[percent_d_result])
