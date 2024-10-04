@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import re
+from collections import OrderedDict
 
 from bs4 import BeautifulSoup as bs
 from bs4.formatter import XMLFormatter
@@ -31,7 +32,7 @@ def adjust_indent(match):
     return f"{indent}{closing_tag}{new_indent}{field_tag}"
 
 NEW_ATTRS = {'required', 'invisible', 'readonly', 'column_invisible'}
-percent_d_regex = re.compile("%\('?\"?[\w\.\d_]+'?\"?\)d")
+percent_d_regex = re.compile(r"%\('?\"?[\w\.\d_]+'?\"?\)d")
 
 def get_files_recursive(path):
     return (str(p) for p in Path(path).glob('**/*.xml') if p.is_file())
@@ -115,10 +116,10 @@ def stringify_attr(stack):
     return result
 
 def get_new_attrs(attrs):
-    new_attrs = {}
-    attrs_dict = eval(attrs.strip())
-    for attr in NEW_ATTRS:
-        if attr in attrs_dict.keys():
+    new_attrs = OrderedDict()
+    attrs_dict = OrderedDict(eval(attrs.strip()))
+    for attr in attrs_dict:
+        if attr in NEW_ATTRS:
             new_attrs[attr] = stringify_attr(attrs_dict[attr])
     return new_attrs
 
@@ -174,13 +175,16 @@ for xml_file in all_xml_files:
                 attrs = tag['attrs']
                 new_attrs = get_new_attrs(attrs)
                 del tag['attrs']
+                # To preserve the order of the modified tags as we add them again,
+                # we need to convert the attrs to an ordered dict
+                tag.attrs = OrderedDict(tag.attrs)
                 for new_attr in new_attrs.keys():
                     tag[new_attr] = new_attrs[new_attr]
             # Management of attributes name="attrs"
             attribute_tags_after = []
             for attribute_tag in attribute_tags_name_attrs:
                 new_attrs = get_new_attrs(attribute_tag.text)
-                for new_attr in new_attrs.keys():
+                for new_attr in reversed(new_attrs.keys()):
                     new_tag = soup.new_tag('attribute')
                     new_tag['name'] = new_attr
                     new_tag.append(str(new_attrs[new_attr]))
