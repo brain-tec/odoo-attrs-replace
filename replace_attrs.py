@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-
 import re
 from collections import OrderedDict
 
@@ -37,9 +36,11 @@ percent_d_regex = re.compile(r"%\('?\"?[\w\.\d_]+'?\"?\)d")
 def get_files_recursive(path):
     return (str(p) for p in Path(path).glob('**/*.xml') if p.is_file())
 
+
 root_dir = input('Enter root directory to check (empty for current directory) : ')
 root_dir = root_dir or '.'
 all_xml_files = get_files_recursive(root_dir)
+
 
 def normalize_domain(domain):
     """Normalize Domain, taken from odoo/osv/expression.py -> just the part so that & operators are added where needed.
@@ -47,11 +48,11 @@ def normalize_domain(domain):
     if len(domain) == 1:
         return domain
     result = []
-    expected = 1                            # expected number of expressions
+    expected = 1  # expected number of expressions
     op_arity = {'!': 1, '&': 2, '|': 2}
     for token in domain:
-        if expected == 0:                   # more than expected, like in [A, B]
-            result[0:0] = ['&']             # put an extra '&' in front
+        if expected == 0:  # more than expected, like in [A, B]
+            result[0:0] = ['&']  # put an extra '&' in front
             expected = 1
         if isinstance(token, (list, tuple)):  # domain term
             expected -= 1
@@ -61,13 +62,27 @@ def normalize_domain(domain):
         result.append(token)
     return result
 
+
 def stringify_leaf(leaf):
     stringify = ''
     switcher = False
     # Replace operators not supported in python (=, like, ilike)
     operator = str(leaf[1])
+
+    # Handle '='
     if operator == '=':
+        if leaf[2] in (False, []):  # Check for False or empty list
+            return f'not {leaf[0]}'
+        elif leaf[2]:  # Check for True
+            return leaf[0]
         operator = '=='
+    # Handle '!='
+    elif operator == '!=':
+        if leaf[2] in (False, []):  # Check for False or empty list
+            return leaf[0]
+        elif leaf[2]:  # Check for True
+            return f'not {leaf[0]}'
+    # Handle 'like' and other operators
     elif 'like' in operator:
         if 'not' in operator:
             operator = 'not in'
@@ -81,9 +96,10 @@ def stringify_leaf(leaf):
     if right_operand in ('True', 'False', '1', '0') or type(right_operand) in (list, tuple, set, int, float, bool):
         right_operand = str(right_operand)
     else:
-        right_operand = "'"+right_operand+"'"
+        right_operand = "'" + right_operand + "'"
     stringify = "%s %s %s" % (right_operand if switcher else left_operand, operator, left_operand if switcher else right_operand)
     return stringify
+
 
 def stringify_attr(stack):
     if stack in (True, False, 'True', 'False', 1, 0, '1', '0'):
@@ -103,17 +119,18 @@ def stringify_attr(stack):
             try:
                 right = result.pop()
             except IndexError:
-                res = left + ('%s' % ' and' if leaf_or_operator=='&' else ' or')
+                res = left + ('%s' % ' and' if leaf_or_operator == '&' else ' or')
                 result.append(res)
                 continue
             form = '(%s %s %s)'
             if index > last_parenthesis_index:
                 form = '%s %s %s'
-            result.append(form % (left, 'and' if leaf_or_operator=='&' else 'or', right))
+            result.append(form % (left, 'and' if leaf_or_operator == '&' else 'or', right))
         else:
             result.append(stringify_leaf(leaf_or_operator))
     result = result[0]
     return result
+
 
 def get_new_attrs(attrs):
     new_attrs = OrderedDict()
@@ -122,6 +139,7 @@ def get_new_attrs(attrs):
         if attr in NEW_ATTRS:
             new_attrs[attr] = stringify_attr(attrs_dict[attr])
     return new_attrs
+
 
 # Prettify puts <attribute> on three lines (1/ opening tag, 2/ text, 3/ closing tag), not very cool.
 # Taken from https://stackoverflow.com/questions/55962146/remove-line-breaks-and-spaces-around-span-elements-with-python-regex
@@ -160,7 +178,7 @@ for xml_file in all_xml_files:
             attribute_tags_name_attrs = soup.select('attribute[name="attrs"]')
             tags_with_states = soup.select('[states]')
             attribute_tags_name_states = soup.select('attribute[name="states"]')
-            if not (tags_with_attrs or attribute_tags_name_attrs or\
+            if not (tags_with_attrs or attribute_tags_name_attrs or \
                     tags_with_states or attribute_tags_name_states):
                 continue
             print('\n################################################################')
@@ -233,7 +251,7 @@ for xml_file in all_xml_files:
                 attribute_tag_states.insert_after(existing_invisible_tag)
                 attribute_tag_states.decompose()
                 attribute_tags_states_after.append(existing_invisible_tag)
-            
+
             print('\n########### Will be replaced by ###\n')
             for t in tags_with_attrs + attribute_tags_after + tags_with_states + attribute_tags_states_after:
                 print(t)
