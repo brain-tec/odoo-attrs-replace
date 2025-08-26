@@ -535,7 +535,7 @@ def main():
 
                 print('\n##### Will be replaced by #####\n')
                 for t in tags_with_attrs + attribute_tags_with_attrs_after + tags_with_states + attribute_tags_with_states_after:
-                    print(etree.tostring(t, encoding='unicode'))
+                    print(format_xml(t))
                 print('\n###############################\n')
                 if autoreplace.lower()[0] == 'n':
                     confirm = input('Do you want to replace? (y/n) (empty == no) : ') or 'n'
@@ -543,10 +543,11 @@ def main():
                     confirm = 'y'
                 if confirm.lower()[0] == 'y':
                     with open(xml_file, 'wb') as rf:
-                        xml_string = etree.tostring(doc, encoding='utf-8', xml_declaration=has_encoding_declaration)
+                        # We need to format the resulting string to avoid having huge one single line tags
+                        xml_string = format_xml(doc)
                         if convert_line_separator_back_to_windows:
-                            xml_string = xml_string.replace(b"\n", b"\r\n")
-                        rf.write(xml_string)
+                            xml_string = xml_string.replace("\n", "\r\n")
+                        rf.write((xml_string + '\n').encode('utf-8'))
                         ok_files.append(xml_file)
         except Exception as e:
             nok_files.append((xml_file, e))
@@ -572,6 +573,55 @@ def main():
         print('Reason: ', file[1])
     if not nok_files:
         print('No files')
+
+def format_element(elem, max_width=80, indent="  ", level=0):
+    """Pretty-print XML element with attributes wrapped if too long."""
+    spaces = indent * level
+    tag_open = f"{spaces}<{elem.tag}"
+    attrs = [f'{k}="{v}"' for k, v in elem.attrib.items()]
+
+    # First try to set everything on a line
+    inline_tag = " ".join([tag_open] + attrs) + ">"
+    if len(inline_tag) <= max_width:
+        lines = [inline_tag]
+    else:
+        # Wrap attributes one per line
+        lines = [tag_open]
+        for attr in attrs:
+            lines.append(f"{spaces}{indent}{attr}")
+        lines[-1] += ">"  # add closing bracket
+
+    # Add text or children
+    if elem.text and elem.text.strip():
+        lines[-1] += elem.text.strip()
+
+    for child in elem:
+        # Recall for child nodes
+        lines.append(format_element(child, max_width, indent, level+1))
+
+    # Closing tag
+    if len(elem):
+        lines.append(f"{spaces}</{elem.tag}>")
+        # If a closing tag only parent is the odoo tag we can add a new line to keep it clean
+        if elem is not None and elem.tag == 'record' and elem.getparent().tag == 'odoo':
+            lines[-1] = lines[-1] + '\n'
+    else:
+        if not (elem.text and elem.text.strip()):
+            lines[-1] = lines[-1][:-1] + "/>" # self-close if empty
+            # for elements which parent is odoo but are not a complex tag (i.e. menuitems) we add a new line afterwards
+            if elem.getparent().tag == 'odoo':
+                lines[-1] = lines[-1] + '\n'
+        else:
+            lines[-1] += f"</{elem.tag}>"
+
+    return "\n".join(lines)
+
+
+
+def format_xml(root, max_width=120, indent="    "):
+    """Format an XML tree for a cleaner output"""
+    return format_element(root, max_width=max_width, indent=indent)
+
 
 if __name__ == "__main__":
     main()
